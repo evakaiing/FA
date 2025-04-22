@@ -19,14 +19,27 @@ class allocator_sorted_list final:
 
 private:
     
-    void *_trusted_memory;
+    void *_trusted_memory = nullptr;
 
     static constexpr const size_t allocator_metadata_size = sizeof(logger*) + sizeof(std::pmr::memory_resource *) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
 
     static constexpr const size_t block_metadata_size = sizeof(void*) + sizeof(size_t);
 
-public:
+    struct allocator_metadata {
+        logger* logger_ptr;
+        std::pmr::memory_resource* parent;
+        allocator_with_fit_mode::fit_mode mode;
+        void* first_free;
+        std::mutex mutex;
+        size_t total_size;
+    };
 
+public:
+    /* выделение доверенной памяти
+     *  доверенная память при этом запрашивается из объекта аллокатора, передаваемого как параметр по умолчанию
+        конструктору (если объект аллокатора отсутствует, память запрашивается из глобальной
+        кучи)
+     */
     explicit allocator_sorted_list(
             size_t space_size,
             std::pmr::memory_resource *parent_allocator = nullptr,

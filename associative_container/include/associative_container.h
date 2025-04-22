@@ -6,13 +6,20 @@
 #include <operation_not_supported.h>
 
 template<typename compare, typename tkey>
-concept compator = requires(const compare c, const tkey& lhs, const tkey& rhs)
+concept compator = requires(const compare c, const tkey& lhs, const tkey& rhs) // существует ли возможность
                    {
                        {c(lhs, rhs)} -> std::same_as<bool>;
                    } && std::copyable<compare> && std::default_initializable<compare>;
+// объект compare является копируемым и дефолтно инициализируемым
+// (можно ли создать объект типа compare без параметров, т.е. констурктором по умолчанию)
 
 template<typename f_iter, typename tkey, typename tval>
-concept input_iterator_for_pair = std::input_iterator<f_iter> && std::same_as<typename std::iterator_traits<f_iter>::value_type, std::pair<tkey, tval>>;
+concept input_iterator_for_pair = std::input_iterator<f_iter> // требование для итератора быть входным
+        && std::same_as<typename std::iterator_traits<f_iter>::value_type, std::pair<tkey, tval>>;  // тип значений на которые указывает итератор f_iter является парой std::pair<tkey, tval>
+
+        // typename тк компилятор не гарантирует, что выражение std::iterator_traits<f_iter>::value_type является типом,
+        // поэтому мы явно указываем, что это тип,
+        // с помощью typename.
 
 
 /**
