@@ -30,11 +30,10 @@ public:
 
     using value_type = std::pair<const tkey, tvalue>;
 
-    template<typename, typename, typename, typename>
-    friend class __detail::bst_impl;
-    // любая инстанция __detail::bst_impl — друг для этого шаблона
+    friend class __detail::bst_impl<tkey, tvalue, compare, tag>;
 
-public: // protected
+
+protected:
     
     struct node
     {
@@ -53,11 +52,13 @@ public: // protected
         virtual ~node() = default;
     };
 
+    friend class __detail::bst_impl<tkey, tvalue, compare, tag>;
+    friend class binary_search_tree<tkey, tvalue, compare, tag>::node;
+
     inline bool compare_keys(const tkey& lhs, const tkey& rhs) const;
     inline bool compare_pairs(const value_type & lhs, const value_type & rhs) const;
 
 public:
-
 
     // region iterators definition
 
@@ -754,7 +755,7 @@ public:
         }
     };
 
-public: // protected
+protected:
     
     node *_root;
     node* _fake_node;
@@ -1001,7 +1002,6 @@ namespace __detail
     template<typename tkey, typename tvalue, typename compare = std::less<tkey>, typename tag = BST_TAG>
     class bst_impl
     {
-    public: // delete
         friend class binary_search_tree<tkey, tvalue, compare, tag>;
 
         using node_t = binary_search_tree<tkey, tvalue, compare, tag>::node;
@@ -1616,12 +1616,12 @@ binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator::operator++() & n
     } else {
         using node_t = binary_search_tree<tkey, tvalue, compare, tag>::node;
         node_t* parent = _data->parent;
-        // если текущий узел — правый сын, то его родитель уже был посещён ранее в инфиксном обходе
+        // Eсли текущий узел — правый сын, то его родитель уже был посещён ранее в инфиксном обходе
         while(parent && (_data == parent->right_subtree)) {
             _data = parent;
             parent = parent->parent;
         }
-        _data = parent ? parent : _backup; // если последний элемент, то в фиктивную ноду
+        _data = parent ? parent : _backup; // Eсли последний элемент, то в фиктивную ноду
     }
 
     return *this;
@@ -1650,7 +1650,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator::operator--() & n
         return *this;
     }
 
-    // есть левое поддерево — идём в него, потом вправо максимально
+    // Eсть левое поддерево — идём в него, потом вправо максимально
     if (_data->left_subtree) {
         _data = _data->left_subtree;
         while (_data->right_subtree) {
@@ -1659,7 +1659,7 @@ binary_search_tree<tkey, tvalue, compare, tag>::infix_iterator::operator--() & n
         return *this;
     }
 
-    // иначе поднимаемся по дереву, пока не найдём узел, из правого которого пришли
+    // Иначе поднимаемся по дереву, пока не найдём узел, из правого которого пришли
     node* cur = _data;
     while (cur->parent && cur == cur->parent->left_subtree) {
         cur = cur->parent;
