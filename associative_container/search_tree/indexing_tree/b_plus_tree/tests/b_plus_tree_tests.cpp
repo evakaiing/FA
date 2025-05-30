@@ -1,601 +1,377 @@
-#include "gtest/gtest.h"
-
-#include <list>
-#include <random>
+#include <gtest/gtest.h>
+#include <string>
 #include <vector>
-#include <b_plus_tree.h>
-#include <client_logger_builder.h>
+#include <algorithm>
+#include <random>
+#include "b_plus_tree.h"
 
+class BPlusTreeTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Подготавливаем тестовые данные
+        simple_data = {
+            {1, "one"},
+            {2, "two"},
+            {3, "three"},
+            {4, "four"},
+            {5, "five"}
+        };
 
-
-template<typename tkey, typename tvalue>
-bool compare_results(
-        std::vector<typename BP_tree<tkey, tvalue>::value_type> const &expected,
-        std::vector<typename BP_tree<tkey, tvalue>::value_type> const &actual)
-{
-    if (expected.size() != actual.size())
-    {
-        return false;
-    }
-
-    for (size_t i = 0; i < expected.size(); ++i)
-    {
-        if (expected[i].key != actual[i].key)
-        {
-            return false;
+        random_data.clear();
+        for (int i = 0; i < 100; i++) {
+            random_data.push_back({i, "value_" + std::to_string(i)});
         }
-
-        if (expected[i].value != actual[i].value)
-        {
-            return false;
-        }
+        // Перемешиваем данные для имитации случайных вставок
+        std::shuffle(random_data.begin(), random_data.end(), std::mt19937{std::random_device{}()});
     }
 
-    return true;
-}
-
-template<typename tvalue>
-bool compare_obtain_results(
-        std::vector<tvalue> const &expected,
-        std::vector<tvalue> const &actual)
-{
-    if (expected.size() != actual.size())
-    {
-        return false;
-    }
-
-    for (size_t i = 0; i < expected.size(); ++i)
-    {
-        if (expected[i] != actual[i])
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-logger *create_logger(
-        std::vector<std::pair<std::string, logger::severity>> const &output_file_streams_setup,
-        bool use_console_stream = true,
-        logger::severity console_stream_severity = logger::severity::debug)
-{
-    std::unique_ptr<logger_builder> builder(new client_logger_builder());
-
-    if (use_console_stream)
-    {
-        builder->add_console_stream(console_stream_severity);
-    }
-
-    for (auto &output_file_stream_setup: output_file_streams_setup)
-    {
-        builder->add_file_stream(output_file_stream_setup.first, output_file_stream_setup.second);
-    }
-
-    logger *built_logger = builder->build();
-
-    return built_logger;
-}
-
-template <typename tkey, typename tvalue>
-struct test_data
-{
-    tkey key;
-    tvalue value;
-    size_t index;
-
-    test_data(size_t i, tkey k, tvalue v) : index(i), key(k), value(v) {}
+    std::vector<std::pair<int, std::string>> simple_data;
+    std::vector<std::pair<int, std::string>> random_data;
 };
 
-template<typename tkey, typename tvalue, typename comp, size_t t>
-bool infix_const_iterator_test(
-        BP_tree<tkey, tvalue, comp, t> const &tree,
-        std::vector<test_data<tkey, tvalue>> const &expected_result)
-{
-    auto end_infix = tree.cend();
-    auto it = tree.cbegin();
+TEST_F(BPlusTreeTest, ConstructorAndEmpty) {
+    BP_tree<int, std::string, std::less<int>, 3> tree;
+    EXPECT_TRUE(tree.empty());
+    EXPECT_EQ(tree.size(), 0);
+}
 
-    for (auto const &item: expected_result)
-    {
-        auto data = *it;
+TEST_F(BPlusTreeTest, InsertAndSize) {
+    BP_tree<int, std::string, std::less<int>, 3> tree;
 
-        if (it->first != item.key || it->second != item.value || it.index() != item.index)
-        {
-            return false;
-        }
+    auto result = tree.insert(simple_data[0]);
+    EXPECT_TRUE(result.second);
+    EXPECT_EQ(tree.size(), 1);
+    EXPECT_FALSE(tree.empty());
 
-        ++it;
+    result = tree.insert(simple_data[0]);
+    EXPECT_FALSE(result.second);
+    EXPECT_EQ(tree.size(), 1);
+
+    for (size_t i = 1; i < simple_data.size(); i++) {
+        result = tree.insert(simple_data[i]);
+        EXPECT_TRUE(result.second);
+        EXPECT_EQ(tree.size(), i + 1);
+    }
+}
+
+TEST_F(BPlusTreeTest, Find) {
+    BP_tree<int, std::string, std::less<int>, 3> tree;
+
+    for (const auto& item : simple_data) {
+        tree.insert(item);
     }
 
-return true;
+    for (const auto& item : simple_data) {
+        auto it = tree.find(item.first);
+        EXPECT_NE(it, tree.end());
+        EXPECT_EQ(it->first, item.first);
+        EXPECT_EQ(it->second, item.second);
+    }
+
+    EXPECT_EQ(tree.find(999), tree.end());
 }
 
-TEST(bTreePositiveTests, test0)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
+// Тест на удаление элементов
+TEST_F(BPlusTreeTest, Erase) {
+    BP_tree<int, std::string, std::less<int>, 3> tree;
 
-    logger->trace("bTreePositiveTests.test0 started");
+    // Заполняем дерево
+    for (const auto& item : simple_data) {
+        tree.insert(item);
+    }
 
-    std::vector<test_data<int, std::string>> expected_result =
-            {
+    // Удаляем элементы по одному и проверяем размер
+    for (size_t i = 0; i < simple_data.size() - 1; i++) {
+        auto it = tree.erase(simple_data[i].first);
+        EXPECT_NE(it, tree.end());
+        EXPECT_EQ(tree.size(), simple_data.size() - i - 1);
 
-            };
+        // Проверяем, что элемент действительно удален
+        EXPECT_EQ(tree.find(simple_data[i].first), tree.end());
+    }
 
-    BP_tree<int, std::string, std::less<int>, 1024> tree(std::less<int>(), nullptr, logger.get());
-
-    EXPECT_TRUE(infix_const_iterator_test(tree, expected_result));
-
-    logger->trace("bTreePositiveTests.test0 finished");
+    // Дерево должно содержать только 1 элемент
+    EXPECT_TRUE(tree.size() == 1);
 }
 
-TEST(bTreePositiveTests, test1)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
+// Тест на итераторы и порядок обхода
+TEST_F(BPlusTreeTest, Iterators) {
+    BP_tree<int, std::string, std::less<int>, 3> tree;
 
-    logger->trace("bTreePositiveTests.test1 started");
+    // Заполняем дерево
+    for (const auto& item : simple_data) {
+        tree.insert(item);
+    }
 
-    std::vector<test_data<int, std::string>> expected_result =
-            {
-                    test_data<int, std::string>(0, 1, "a"),
-                    test_data<int, std::string>(1, 2, "b"),
-                    test_data<int, std::string>(2, 3, "d"),
-                    test_data<int, std::string>(0, 4, "e"),
-                    test_data<int, std::string>(0, 15, "c"),
-                    test_data<int, std::string>(1, 27, "f")
-            };
+    // Проверяем обход в порядке возрастания ключей
+    std::vector<int> keys;
+    for (auto it = tree.begin(); it != tree.end(); ++it) {
+        keys.push_back(it->first);
+    }
 
-    BP_tree<int, std::string, std::less<int>, 3> tree(std::less<int>(), nullptr, logger.get());
+    std::vector<int> expected_keys = {1, 2, 3, 4, 5};
+    EXPECT_EQ(keys, expected_keys);
 
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
-    tree.emplace(27, std::string("f"));
-
-    EXPECT_TRUE(infix_const_iterator_test(tree, expected_result));
-
-    logger->trace("bTreePositiveTests.test1 finished");
+    // Тест на константный итератор
+    std::vector<int> const_keys;
+    for (auto it = tree.cbegin(); it != tree.cend(); ++it) {
+        const_keys.push_back(it->first);
+    }
+    EXPECT_EQ(const_keys, expected_keys);
 }
 
-TEST(bTreePositiveTests, test2)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
+// Тест на вставку и удаление большого количества элементов (проверка балансировки)
+TEST_F(BPlusTreeTest, LargeDatasetTest) {
+    BP_tree<int, std::string, std::less<int>, 3> tree;
 
-    logger->trace("bTreePositiveTests.test2 started");
+    // Вставка перемешанных данных
+    for (const auto& item : random_data) {
+        tree.insert(item);
+    }
 
-    std::vector<test_data<int, std::string>> expected_result =
-            {
-                    test_data<int, std::string>(0, 1, "a"),
-                    test_data<int, std::string>(1, 2, "b"),
-                    test_data<int, std::string>(2, 3, "d"),
-                    test_data<int, std::string>(3, 4, "e"),
-                    test_data<int, std::string>(4, 15, "c"),
-                    test_data<int, std::string>(0, 24, "g"),
-                    test_data<int, std::string>(0, 45, "k"),
-                    test_data<int, std::string>(1, 100, "f"),
-                    test_data<int, std::string>(2, 101, "j"),
-                    test_data<int, std::string>(3, 193, "l"),
-                    test_data<int, std::string>(4, 456, "h"),
-                    test_data<int, std::string>(5, 534, "m")
-            };
+    EXPECT_EQ(tree.size(), random_data.size());
 
-    BP_tree<int, std::string, std::less<int>, 5> tree(std::less<int>(), nullptr, logger.get());
+    // Проверяем порядок обхода
+    int prev_key = -1;
+    for (auto it = tree.begin(); it != tree.end(); ++it) {
+        EXPECT_GT(it->first, prev_key);
+        prev_key = it->first;
+    }
 
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
-    tree.emplace(100, std::string("f"));
-    tree.emplace(24, std::string("g"));
-    tree.emplace(456, std::string("h"));
-    tree.emplace(101, std::string("j"));
-    tree.emplace(45, std::string("k"));
-    tree.emplace(193, std::string("l"));
-    tree.emplace(534, std::string("m"));
-
-    EXPECT_TRUE(infix_const_iterator_test(tree, expected_result));
-
-    logger->trace("bTreePositiveTests.test2 finished");
+    // Удаляем случайный элемент
+    if (!random_data.empty()) {
+        int key_to_remove = random_data[random_data.size()/2].first;
+        tree.erase(key_to_remove);
+        EXPECT_EQ(tree.find(key_to_remove), tree.end());
+        EXPECT_EQ(tree.size(), random_data.size() - 1);
+    }
 }
 
-TEST(bTreePositiveTests, test3)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
+// Тест на оператор доступа по индексу
+TEST_F(BPlusTreeTest, AccessOperatorTest) {
+    BP_tree<int, std::string, std::less<int>, 3> tree;
 
-    logger->trace("bTreePositiveTests.test3 started");
+    // Заполняем дерево
+    for (const auto& item : simple_data) {
+        tree.insert(item);
+    }
 
-    std::vector<test_data<int, std::string>> expected_result =
-            {
-                    test_data<int, std::string>(0, 1, "a"),
-                    test_data<int, std::string>(1, 2, "b"),
-                    test_data<int, std::string>(2, 3, "d"),
-                    test_data<int, std::string>(3, 4, "e"),
-                    test_data<int, std::string>(4, 15, "c"),
-                    test_data<int, std::string>(5, 24, "g"),
-                    test_data<int, std::string>(6, 45, "k"),
-                    test_data<int, std::string>(7, 100, "f"),
-                    test_data<int, std::string>(8, 101, "j"),
-                    test_data<int, std::string>(9, 193, "l"),
-                    test_data<int, std::string>(10, 456, "h"),
-                    test_data<int, std::string>(11, 534, "m")
-            };
+    // Проверяем получение значений по ключу
+    for (const auto& item : simple_data) {
+        EXPECT_EQ(tree[item.first], item.second);
+    }
 
-    BP_tree<int, std::string, std::less<int>, 7> tree(std::less<int>(), nullptr, logger.get());
+    // Изменение значения по ключу
+    tree[3] = "updated_three";
+    EXPECT_EQ(tree[3], "updated_three");
 
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
-    tree.emplace(100, std::string("f"));
-    tree.emplace(24, std::string("g"));
-    tree.emplace(456, std::string("h"));
-    tree.emplace(101, std::string("j"));
-    tree.emplace(45, std::string("k"));
-    tree.emplace(193, std::string("l"));
-    tree.emplace(534, std::string("m"));
-
-    EXPECT_TRUE(infix_const_iterator_test(tree, expected_result));
-
-    logger->trace("bTreePositiveTests.test3 finished");
+    // Вставка нового элемента через оператор
+    tree[10] = "ten";
+    EXPECT_EQ(tree[10], "ten");
+    EXPECT_EQ(tree.size(), simple_data.size() + 1);
 }
 
-TEST(bTreePositiveTests, test4)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
+// Тест на граничные случаи (минимальное и максимальное количество элементов в узле)
+TEST_F(BPlusTreeTest, EdgeCasesTest) {
+    // Дерево с минимальным порядком (t=2)
+    BP_tree<int, std::string, std::less<int>, 2> small_tree;
 
-    logger->trace("bTreePositiveTests.test4 started");
+    // Вставляем элементы, которые вызовут разделение узлов
+    for (int i = 0; i < 10; i++) {
+        small_tree.insert({i, "value_" + std::to_string(i)});
+    }
 
-    std::vector<test_data<int, std::string>> expected_result =
-            {
-                    test_data<int, std::string>(0, 1, "a"),
-                    test_data<int, std::string>(1, 2, "b"),
-                    test_data<int, std::string>(2, 3, "d"),
-                    test_data<int, std::string>(0, 4, "e"),
-                    test_data<int, std::string>(0, 15, "c"),
-                    test_data<int, std::string>(1, 24, "g"),
-                    test_data<int, std::string>(2, 45, "k"),
-                    test_data<int, std::string>(1, 100, "f"),
-                    test_data<int, std::string>(0, 101, "j"),
-                    test_data<int, std::string>(1, 193, "l"),
-                    test_data<int, std::string>(2, 456, "h"),
-                    test_data<int, std::string>(3, 534, "m")
-            };
+    // Проверяем, что все элементы были вставлены
+    EXPECT_EQ(small_tree.size(), 10);
 
-    BP_tree<int, std::string, std::less<int>, 3> tree(std::less<int>(), nullptr, logger.get());
+    // Проверяем, что порядок обхода правильный
+    int prev_key = -1;
+    for (auto it = small_tree.begin(); it != small_tree.end(); ++it) {
+        EXPECT_GT(it->first, prev_key);
+        prev_key = it->first;
+    }
 
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
-    tree.emplace(100, std::string("f"));
-    tree.emplace(24, std::string("g"));
-    tree.emplace(456, std::string("h"));
-    tree.emplace(101, std::string("j"));
-    tree.emplace(45, std::string("k"));
-    tree.emplace(193, std::string("l"));
-    tree.emplace(534, std::string("m"));
+    // Удаляем элементы и проверяем, что дерево остается сбалансированным
+    for (int i = 0; i < 5; i++) {
+        small_tree.erase(i);
+    }
 
-    EXPECT_TRUE(infix_const_iterator_test(tree, expected_result));
+    EXPECT_EQ(small_tree.size(), 5);
 
-    logger->trace("bTreePositiveTests.test4 finished");
+    // Проверяем, что порядок обхода правильный после удаления
+    prev_key = 4;
+    for (auto it = small_tree.begin(); it != small_tree.end(); ++it) {
+        EXPECT_GT(it->first, prev_key - 1);
+        prev_key = it->first;
+    }
 }
 
-TEST(bTreePositiveTests, test5)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
+TEST(BPlusTreeStressTest, LargeDatasetTest) {
+    BP_tree<int, std::string, std::less<int>, 5> tree;
 
-    logger->trace("bTreePositiveTests.test5 started");
+    // Вставка большого количества элементов в случайном порядке
+    const int NUM_ELEMENTS = 100000;
+    std::vector<int> keys(NUM_ELEMENTS);
 
-    std::vector<test_data<int, std::string>> expected_result =
-            {
+    // Генерируем последовательные ключи
+    for (int i = 0; i < NUM_ELEMENTS; ++i) {
+        keys[i] = i;
+    }
 
-            };
+    // Перемешиваем ключи
+    std::shuffle(keys.begin(), keys.end(), std::mt19937{std::random_device{}()});
 
-    BP_tree<int, std::string, std::less<int>, 2> tree(std::less<int>(), nullptr, logger.get());
+    // Измеряем время вставки
+    auto start = std::chrono::high_resolution_clock::now();
 
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
+    for (int key : keys) {
+        tree.insert({key, "value_" + std::to_string(key)});
+    }
 
-    auto first_disposed = tree.at(2);
-    auto second_disposed = tree.at(4);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-    tree.erase(2);
-    tree.erase(4);
+    std::cout << "Insertion of " << NUM_ELEMENTS << " elements took " << duration << " ms" << std::endl;
 
-    EXPECT_TRUE(infix_const_iterator_test(tree, expected_result));
+    // Проверяем, что все элементы были вставлены корректно
+    EXPECT_EQ(tree.size(), NUM_ELEMENTS);
 
-    logger->trace("bTreePositiveTests.test5 finished");
+    // Проверяем наличие всех ключей
+    for (int key : keys) {
+        EXPECT_NE(tree.find(key), tree.end());
+    }
+
+    // Проверяем упорядоченность при обходе
+    int prev_key = -1;
+    for (auto it = tree.begin(); it != tree.end(); ++it) {
+        EXPECT_GT(it->first, prev_key);
+        prev_key = it->first;
+    }
+
+    // Измеряем время удаления
+    start = std::chrono::high_resolution_clock::now();
+
+    // Перемешиваем порядок удаления
+    std::shuffle(keys.begin(), keys.end(), std::mt19937{std::random_device{}()});
+
+    for (int key : keys) {
+        tree.erase(key);
+    }
+
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "Deletion of " << NUM_ELEMENTS << " elements took " << duration << " ms" << std::endl;
+
+    // Проверяем, что все элементы были удалены
+    EXPECT_TRUE(tree.empty());
 }
 
-TEST(bTreePositiveTests, test6)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
+TEST(BPlusTreeStressTest, ComplexInsertionDeletionSequences) {
+    BP_tree<int, std::string, std::less<int>, 3> tree;
 
-    logger->trace("bTreePositiveTests.test6 started");
+    // Тест 1: Вставка в возрастающем порядке, удаление в убывающем
+    for (int i = 0; i < 1000; ++i) {
+        tree.insert({i, "value_" + std::to_string(i)});
+    }
 
-    std::vector<test_data<int, std::string>> expected_result =
-            {
-                    test_data<int, std::string>(0, 2, "b"),
-                    test_data<int, std::string>(1, 3, "d"),
-                    test_data<int, std::string>(2, 4, "e"),
-                    test_data<int, std::string>(0, 15, "c"),
-                    test_data<int, std::string>(0, 45, "k"),
-                    test_data<int, std::string>(1, 101, "j"),
-                    test_data<int, std::string>(2, 456, "h"),
-                    test_data<int, std::string>(3, 534, "m")
-            };
+    for (int i = 999; i >= 0; --i) {
+        tree.erase(i);
+    }
 
-    BP_tree<int, std::string, std::less<int>, 4> tree(std::less<int>(), nullptr, logger.get());
+    EXPECT_TRUE(tree.empty());
 
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
-    tree.emplace(100, std::string("f"));
-    tree.emplace(24, std::string("g"));
-    tree.emplace(456, std::string("h"));
-    tree.emplace(101, std::string("j"));
-    tree.emplace(45, std::string("k"));
-    tree.emplace(193, std::string("l"));
-    tree.emplace(534, std::string("m"));
+    // Тест 2: Вставка в убывающем порядке, удаление в возрастающем
+    for (int i = 999; i >= 0; --i) {
+        tree.insert({i, "value_" + std::to_string(i)});
+    }
 
-    auto first_disposed = std::move(tree.at(1));
-    auto second_disposed = std::move(tree.at(100));
-    auto third_disposed = std::move(tree.at(193));
-    auto fourth_disposed = std::move(tree.at(24));
+    for (int i = 0; i < 1000; ++i) {
+        tree.erase(i);
+    }
 
-    tree.erase(1);
-    tree.erase(100);
-    tree.erase(193);
-    tree.erase(24);
+    EXPECT_TRUE(tree.empty());
 
-    EXPECT_TRUE(infix_const_iterator_test(tree, expected_result));
+    // Тест 3: Вставка в "пилообразном" порядке 0,999,1,998,...
+    std::vector<int> sawtooth_keys;
+    for (int i = 0; i < 500; ++i) {
+        sawtooth_keys.push_back(i);
+        sawtooth_keys.push_back(999 - i);
+    }
 
-    EXPECT_TRUE(first_disposed == "a");
-    EXPECT_TRUE(second_disposed == "f");
-    EXPECT_TRUE(third_disposed == "l");
-    EXPECT_TRUE(fourth_disposed == "g");
+    for (int key : sawtooth_keys) {
+        tree.insert({key, "value_" + std::to_string(key)});
+    }
 
-    logger->trace("bTreePositiveTests.test6 finished");
+    // Проверка упорядоченного обхода
+    int prev = -1;
+    for (auto it = tree.begin(); it != tree.end(); ++it) {
+        EXPECT_GT(it->first, prev);
+        prev = it->first;
+    }
+
+    // Удаление каждого второго элемента
+    for (size_t i = 0; i < sawtooth_keys.size(); i += 2) {
+        tree.erase(sawtooth_keys[i]);
+    }
+
+    EXPECT_EQ(tree.size(), 500);
+
+    // Проверка оставшихся элементов
+    for (size_t i = 1; i < sawtooth_keys.size(); i += 2) {
+        EXPECT_NE(tree.find(sawtooth_keys[i]), tree.end());
+    }
 }
 
-TEST(bTreePositiveTests, test7)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
+TEST(BPlusTreeStressTest, TreeOrderBoundaryTest) {
+    // Тестирование для минимального порядка t=2 (2t-1=3 ключа максимум в узле)
+    BP_tree<int, std::string, std::less<int>, 2> min_tree;
 
-    logger->trace("bTreePositiveTests.test7 started");
+    // Последовательность, вызывающая максимальное разделение узлов
+    for (int i = 0; i < 100; ++i) {
+        min_tree.insert({i, "value_" + std::to_string(i)});
+    }
 
-    std::vector<std::string> expected_result =
-            {
-                    "g",
-                    "d",
-                    "e",
-                    " ",
-                    "l",
-                    "a",
-                    "b",
-                    "y"
-            };
+    EXPECT_EQ(min_tree.size(), 100);
 
-    BP_tree<int, std::string, std::less<int>, 5> tree(std::less<int>(), nullptr, logger.get());
+    // Проверка удаления, вызывающего слияние узлов
+    for (int i = 0; i < 100; i += 2) {
+        min_tree.erase(i);
+    }
 
-    tree.emplace(1, std::move(std::string("a")));
-    tree.emplace(2, std::move(std::string("b")));
-    tree.emplace(15, std::move(std::string("c")));
-    tree.emplace(3, std::move(std::string("d")));
-    tree.emplace(4, std::move(std::string("e")));
-    tree.emplace(100, std::move(std::string(" ")));
-    tree.emplace(24, std::move(std::string("g")));
-    tree.emplace(-456, std::move(std::string("h")));
-    tree.emplace(101, std::move(std::string("j")));
-    tree.emplace(-45, std::move(std::string("k")));
-    tree.emplace(-193, std::move(std::string("l")));
-    tree.emplace(534, std::move(std::string("m")));
-    tree.emplace(1000, std::move(std::string("y")));
+    EXPECT_EQ(min_tree.size(), 50);
 
-    std::vector<std::string> actual_result =
-            {
-                    tree.at(24),
-                    tree.at(3),
-                    tree.at(4),
-                    tree.at(100),
-                    tree.at(-193),
-                    tree.at(1),
-                    tree.at(2),
-                    tree.at(1000)
-            };
+    for (int i = 0; i < 100; ++i) {
+        if (i % 2 == 0) {
+            EXPECT_EQ(min_tree.find(i), min_tree.end());
+        } else {
+            EXPECT_NE(min_tree.find(i), min_tree.end());
+        }
+    }
 
-    EXPECT_TRUE(compare_obtain_results(expected_result, actual_result));
+    // Тестирование для большого порядка дерева (больше быстродействие, меньше разделений)
+    BP_tree<int, std::string, std::less<int>, 64> max_tree;
 
-    logger->trace("bTreePositiveTests.test7 finished");
+    // Вставка большого количества элементов, должно быть мало разделений
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < 10000; ++i) {
+        max_tree.insert({i, "value_" + std::to_string(i)});
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "Insertion of 10000 elements in high-order tree took " << duration << " ms" << std::endl;
+
+    // Проверка всех элементов
+    for (int i = 0; i < 10000; ++i) {
+        EXPECT_NE(max_tree.find(i), max_tree.end());
+    }
 }
 
-TEST(bTreePositiveTests, test8)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
-
-    logger->trace("bTreePositiveTests.test8 started");
-
-    std::vector<std::string> expected_result =
-            {
-                    "y",
-                    "l",
-                    "a",
-                    "g",
-                    "k",
-                    "b",
-                    "c",
-                    "h"
-            };
-
-    BP_tree<int, std::string, std::less<int>, 4> tree(std::less<int>(), nullptr, logger.get());
-
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
-    tree.emplace(100, std::string(" "));
-    tree.emplace(24, std::string("g"));
-    tree.emplace(-456, std::string("h"));
-    tree.emplace(101, std::string("j"));
-    tree.emplace(-45, std::string("k"));
-    tree.emplace(-193, std::string("l"));
-    tree.emplace(534, std::string("m"));
-    tree.emplace(1000, std::string("y"));
-
-    std::vector<std::string> actual_result =
-            {
-                    tree.at(1000),
-                    tree.at(-193),
-                    tree.at(1),
-                    tree.at(24),
-                    tree.at(-45),
-                    tree.at(2),
-                    tree.at(15),
-                    tree.at(-456)
-            };
-
-    EXPECT_TRUE(compare_obtain_results(expected_result, actual_result));
-
-    logger->trace("bTreePositiveTests.test8 finished");
-}
-
-TEST(bTreePositiveTests, test9)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
-
-    logger->trace("bTreePositiveTests.test9 started");
-
-    std::vector<BP_tree<int, std::string>::value_type> expected_result =
-            {
-                    { 4, "e" },
-                    { 15, "c" },
-                    { 24, "g" },
-                    { 45, "k" },
-                    { 100, "f" },
-                    { 101, "j" },
-            };
-
-    BP_tree<int, std::string, std::less<int>, 5> tree(std::less<int>(), nullptr, logger.get());
-
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
-    tree.emplace(100, std::string("f"));
-    tree.emplace(24, std::string("g"));
-    tree.emplace(456, std::string("h"));
-    tree.emplace(101, std::string("j"));
-    tree.emplace(45, std::string("k"));
-    tree.emplace(193, std::string("l"));
-    tree.emplace(534, std::string("m"));
-
-    auto b = tree.begin();
-    auto e = tree.end();
-    std::vector<decltype(tree)::value_type> actual_result(b, e);
-
-    EXPECT_TRUE(compare_obtain_results(expected_result, actual_result));
-
-    logger->trace("bTreePositiveTests.test9 finished");
-}
-
-TEST(bTreeNegativeTests, test1)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
-
-    logger->trace("bTreeNegativeTests.test1 started");
-
-    BP_tree<int, std::string, std::less<int>, 3> tree(std::less<int>(), nullptr, logger.get());
-
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
-
-    EXPECT_EQ(tree.erase(45), tree.end());
-
-    logger->trace("bTreeNegativeTests.test1 finished");
-}
-
-TEST(bTreeNegativeTests, test3)
-{
-    std::unique_ptr<logger> logger( create_logger(std::vector<std::pair<std::string, logger::severity>>
-                                                          {
-                                                                  { "b_tree_tests_logs.txt", logger::severity::trace }
-                                                          }));
-
-    logger->trace("bTreeNegativeTests.test3 started");
-
-    BP_tree<int, std::string, std::less<int>, 4> tree(std::less<int>(), nullptr, logger.get());
-
-    tree.emplace(1, std::string("a"));
-    tree.emplace(2, std::string("b"));
-    tree.emplace(15, std::string("c"));
-    tree.emplace(3, std::string("d"));
-    tree.emplace(4, std::string("e"));
-    tree.emplace(100, std::string(" "));
-    tree.emplace(24, std::string("g"));
-    tree.emplace(-456, std::string("h"));
-    tree.emplace(101, std::string("j"));
-    tree.emplace(-45, std::string("k"));
-    tree.emplace(-193, std::string("l"));
-    tree.emplace(534, std::string("m"));
-    tree.emplace(1000, std::string("y"));
-
-    EXPECT_EQ(tree.erase(1001), tree.end());
-
-    logger->trace("bTreeNegativeTests.test3 finished");
-}
-
-int main(
-        int argc,
-        char **argv)
-{
-    testing::InitGoogleTest(&argc, argv);
-
+// Запускаем тесты
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

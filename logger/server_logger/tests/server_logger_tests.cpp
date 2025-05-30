@@ -1,10 +1,10 @@
 #include "server.h"
-#include <server_logger_builder.h>
+#include "server_logger_builder.h"
+#include <memory>
+#include <gtest/gtest.h>
 
-int main()
+TEST(my_test, t1)
 {
-
-
     server_logger_builder builder;
 
     builder.add_file_stream("a.txt", logger::severity::trace).add_file_stream("b.txt", logger::severity::debug).
@@ -15,5 +15,14 @@ int main()
     log->trace("good").debug("debug");
 
     log->trace("IT is a very long strange message !!!!!!!!!!%%%%%%%%\tzdtjhdjh").
-		information("bfldknbpxjxjvpxvjbpzjbpsjbpsjkgbpsejegpsjpegesjpvbejpvjzepvgjs");
+            information("bfldknbpxjxjvpxvjbpzjbpsjbpsjkgbpsejegpsjpegesjpvbejpvjzepvgjs");
+}
+
+int main(int argc, char* argv[])
+{
+    testing::InitGoogleTest(&argc, argv);
+
+    return RUN_ALL_TESTS();
+
+
 }

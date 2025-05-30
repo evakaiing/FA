@@ -4,6 +4,10 @@
 #include <big_int.h>
 #include <not_implemented.h>
 #include <concepts>
+#include <cstdlib>
+#include <sstream>
+
+
 
 class fraction final
 {
@@ -13,7 +17,9 @@ private:
     big_int _numerator;
     big_int _denominator;
 
-    void optimise(); //сокращает дробь
+    void optimise();
+
+
 
 public:
 
@@ -23,6 +29,10 @@ public:
     fraction(f &&numerator, s &&denominator);
 
     fraction(pp_allocator<big_int::value_type> = pp_allocator<big_int::value_type>());
+
+    fraction abs() const;
+
+    double to_double() const;
 
 public:
 
@@ -42,6 +52,8 @@ public:
 
     fraction operator/(fraction const &other) const;
 
+    fraction operator-() const;
+
 public:
 
     bool operator==(fraction const &other) const noexcept;
@@ -56,7 +68,11 @@ public:
 
     std::string to_string() const;
 
+    fraction modulo_2pi() const;
+
 public:
+
+    fraction pi();
 
     fraction sin(fraction const &epsilon = fraction(1_bi, 1000000_bi)) const;
 

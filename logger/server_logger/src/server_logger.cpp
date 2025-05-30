@@ -11,7 +11,7 @@
 server_logger::~server_logger() noexcept
 {
     std::string pid = std::to_string(inner_getpid());
-    auto res = _client.Get("/destroy?pid=" + pid);
+    auto res = _client->Get("/destroy?pid=" + pid);
 }
 
 logger &server_logger::log(
@@ -39,7 +39,7 @@ logger &server_logger::log(
     std::string url = "/log?pid=" + pid +
                       "&sev=" + severity_to_string(severity) +
                       "&message=" + encoded_message;
-    auto res = _client.Get(url);
+    auto res = _client->Get(url);
 
     return *this;
 }
@@ -93,14 +93,14 @@ std::string server_logger::make_format(const std::string &message, severity sev)
 
 server_logger::server_logger(const std::string &dest,
                              const std::unordered_map<logger::severity, std::pair<std::string, bool> > &
-                             streams, const std::string &format) : _client(dest), _streams(streams), _format(format)
+                             streams, const std::string &format) :  _client(std::make_unique<httplib::Client>(dest)), _streams(streams), _format(format)
 {
     std::string pid = std::to_string(inner_getpid());
     for (const auto &[sev, stream_info]: streams)
     {
         std::string url = "/init?pid=" + pid + "&sev=" + severity_to_string(sev) + "&path="
                           + stream_info.first + "&console=" + std::to_string(+stream_info.second);
-        auto res = _client.Get(url);
+        auto res = _client->Get(url);
     }
 }
 

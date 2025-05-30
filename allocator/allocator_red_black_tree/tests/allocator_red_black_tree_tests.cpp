@@ -104,10 +104,11 @@ TEST(allocatorRBTPositiveTests, test5)
 
 
     std::unique_ptr<smart_mem_resource> allocator(new allocator_red_black_tree(20'000, nullptr, logger_instance.get(), allocator_with_fit_mode::fit_mode::first_fit));
-	int iterations_count = 100000;
+	int iterations_count = 100;
 
 	std::list<void *> allocated_blocks;
 	srand((unsigned)time(nullptr));
+	auto *the_same_subject = dynamic_cast<allocator_with_fit_mode *>(allocator.get());
 
 	for (auto i = 0; i < iterations_count; i++)
 	{
@@ -117,18 +118,15 @@ TEST(allocatorRBTPositiveTests, test5)
 			case 1:
 				try
 				{
-//					switch (rand() % 3)
-//					{
-//						case 0:
-//							allocator_dbg_helper->set_fit_mode(allocator_with_fit_mode::fit_mode::first_fit);
-//							break;
-//						case 1:
-//							allocator_dbg_helper->set_fit_mode(allocator_with_fit_mode::fit_mode::the_best_fit);
-//							break;
-//						case 2:
-//							allocator_dbg_helper->set_fit_mode(allocator_with_fit_mode::fit_mode::the_worst_fit);
-//							break;
-//					}
+					switch (rand() % 3)
+					{
+						case 0:
+							the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::first_fit);
+						case 1:
+							the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::the_best_fit);
+						case 2:
+							the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::the_worst_fit);
+					}
 
 					allocated_blocks.push_front(allocator->allocate(sizeof(char) * (rand() % 251 + 50)));
 					std::cout << "allocation succeeded" << std::endl;

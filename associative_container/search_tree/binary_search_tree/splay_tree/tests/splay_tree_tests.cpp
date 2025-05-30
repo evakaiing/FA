@@ -4,6 +4,8 @@
 #include <client_logger_builder.h>
 #include <iostream>
 
+
+
 logger *create_logger(
         std::vector<std::pair<std::string, logger::severity>> const &output_file_streams_setup,
         bool use_console_stream = true,
@@ -30,30 +32,21 @@ logger *create_logger(
 }
 
 bool compare_results(
-        std::vector<typename binary_search_tree<int, std::string>::value_type> &expected,
-        std::vector<typename binary_search_tree<int, std::string>::value_type> &actual)
+        const std::vector<typename binary_search_tree<int, std::string>::value_type> &expected,
+        const std::vector<typename binary_search_tree<int, std::string>::value_type> &actual)
 {
-
     if (expected.size() != actual.size())
-    {
         return false;
-    }
 
-    for (auto&& val : std::views::zip(expected, actual))
-    {
-        if (std::get<0>(val).first != std::get<1>(val).first)
-        {
+    for (size_t i = 0; i < expected.size(); ++i) {
+        if (expected[i].first != actual[i].first)
             return false;
-        }
-
-        if (std::get<0>(val).second != std::get<1>(val).second)
-        {
+        if (expected[i].second != actual[i].second)
             return false;
-        }
     }
-
     return true;
 }
+
 
 template<typename tkey, typename tvalue>
 struct test_data

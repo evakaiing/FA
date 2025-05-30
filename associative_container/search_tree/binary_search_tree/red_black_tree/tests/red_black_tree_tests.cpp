@@ -41,14 +41,14 @@ bool compare_results(
         return false;
     }
 
-    for (auto&& val : std::views::zip(expected, actual))
+    for (size_t i = 0; i < expected.size(); ++i)
     {
-        if (std::get<0>(val).first != std::get<1>(val).first)
+        if (expected[i].first != actual[i].first)
         {
             return false;
         }
 
-        if (std::get<0>(val).second != std::get<1>(val).second)
+        if (expected[i].second != actual[i].second)
         {
             return false;
         }

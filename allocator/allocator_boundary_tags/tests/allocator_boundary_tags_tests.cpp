@@ -27,7 +27,6 @@ logger *create_logger(
     return logger_instance;
 }
 
-//TODO: recalculate size
 
 TEST(positiveTests, test1)
 {

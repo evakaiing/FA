@@ -54,7 +54,13 @@ private:
      * TODO: You must improve it for alignment support
      */
 
-    static constexpr const size_t allocator_metadata_size = sizeof(logger*) + sizeof(allocator_dbg_helper*) + sizeof(fit_mode) + sizeof(unsigned char) + sizeof(std::mutex);
+    static constexpr const size_t allocator_metadata_size =
+    sizeof(logger*) +
+    sizeof(std::pmr::memory_resource*) +
+    sizeof(fit_mode) +
+    sizeof(unsigned char) +
+    sizeof(std::mutex);
+
 
     static constexpr const size_t occupied_block_metadata_size = sizeof(block_metadata) + sizeof(void*);
 
@@ -71,24 +77,24 @@ public:
             allocator_with_fit_mode::fit_mode allocate_fit_mode = allocator_with_fit_mode::fit_mode::first_fit);
 
     allocator_buddies_system(
-        allocator_buddies_system const &other);
-    
+        allocator_buddies_system const &other) = delete;
+
     allocator_buddies_system &operator=(
-        allocator_buddies_system const &other);
-    
+        allocator_buddies_system const &other) = delete;
+
     allocator_buddies_system(
         allocator_buddies_system &&other) noexcept;
-    
+
     allocator_buddies_system &operator=(
         allocator_buddies_system &&other) noexcept;
 
     ~allocator_buddies_system() override;
 
 public:
-    
+
     [[nodiscard]] void *do_allocate_sm(
         size_t size) override;
-    
+
     void do_deallocate_sm(
         void *at) override;
 
@@ -101,11 +107,21 @@ public:
     std::vector<allocator_test_utils::block_info> get_blocks_info() const noexcept override;
 
 private:
+    void try_merge_with_buddy(void *block);
 
-    
+    void split_block(void* block);
+    void* allocate_first_fit(size_t size);
+    void* allocate_best_fit(size_t size);
+    void* allocate_worst_fit(size_t size);
+
+    std::pmr::memory_resource* get_parent_resource() const noexcept;
     inline logger *get_logger() const override;
-    
+
     inline std::string get_typename() const override;
+
+    allocator_with_fit_mode::fit_mode get_fit_mode() const;
+
+    inline std::mutex &get_mutex() const;
 
     std::vector<allocator_test_utils::block_info> get_blocks_info_inner() const override;
 

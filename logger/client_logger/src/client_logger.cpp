@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <utility>
 #include "../include/client_logger.h"
-#include <not_implemented.h>
 
 std::unordered_map<std::string, std::pair<size_t, std::ofstream>> client_logger::refcounted_stream::_global_streams;
 

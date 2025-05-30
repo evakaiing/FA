@@ -2,7 +2,6 @@
 #define MATH_PRACTICE_AND_OPERATING_SYSTEMS_CLIENT_LOGGER_H
 
 #include <logger.h>
-#include <array>
 #include <unordered_map>
 #include <forward_list>
 #include <fstream>

@@ -8,7 +8,7 @@
 class server_logger_builder;
 class server_logger final : public logger
 {
-    httplib::Client _client;
+    std::unique_ptr<httplib::Client> _client;
     std::unordered_map<logger::severity, std::pair<std::string, bool>> _streams;
     std::string _format;
 

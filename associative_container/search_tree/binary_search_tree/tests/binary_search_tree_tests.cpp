@@ -136,7 +136,8 @@ bool postfix_iterator_test(
     return true;
 }
 
-/*TEST(binarySearchTreePositiveTests, noIteratorTest)
+/*
+TEST(binarySearchTreePositiveTests, noIteratorTest)
 {
     std::unique_ptr<logger> logger(create_logger(std::vector<std::pair<std::string, logger::severity>>
                                            {
@@ -147,7 +148,7 @@ bool postfix_iterator_test(
                                            }));
     logger->trace("binarySearchTreePositiveTests.test1 started");
 
-    auto al = std::make_unique<allocator_sorted_list>(10000);
+    auto al = std::make_unique<allocator_sorted_list>(pp_allocator<int>());
 
     auto bst = std::make_unique<binary_search_tree<int, std::string>>(std::less<int>(), al.get(), logger.get());
 //    auto bst = new binary_search_tree<int, std::string>(key_comparer(), al.get(), logger.get());

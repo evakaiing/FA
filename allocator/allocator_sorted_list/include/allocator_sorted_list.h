@@ -19,27 +19,14 @@ class allocator_sorted_list final:
 
 private:
     
-    void *_trusted_memory = nullptr;
+    void *_trusted_memory;
 
-    static constexpr const size_t allocator_metadata_size = sizeof(logger*) + sizeof(std::pmr::memory_resource *) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + sizeof(void*);
+    static constexpr const size_t allocator_metadata_size = sizeof(logger*) + sizeof(std::pmr::memory_resource *) + sizeof(fit_mode) + sizeof(size_t) + sizeof(std::mutex) + 4 + sizeof(void*);
 
     static constexpr const size_t block_metadata_size = sizeof(void*) + sizeof(size_t);
 
-    struct allocator_metadata {
-        logger* logger_ptr;
-        std::pmr::memory_resource* parent;
-        allocator_with_fit_mode::fit_mode mode;
-        void* first_free;
-        std::mutex mutex;
-        size_t total_size;
-    };
-
 public:
-    /* выделение доверенной памяти
-     *  доверенная память при этом запрашивается из объекта аллокатора, передаваемого как параметр по умолчанию
-        конструктору (если объект аллокатора отсутствует, память запрашивается из глобальной
-        кучи)
-     */
+
     explicit allocator_sorted_list(
             size_t space_size,
             std::pmr::memory_resource *parent_allocator = nullptr,
@@ -47,10 +34,10 @@ public:
             allocator_with_fit_mode::fit_mode allocate_fit_mode = allocator_with_fit_mode::fit_mode::first_fit);
     
     allocator_sorted_list(
-        allocator_sorted_list const &other);
+        allocator_sorted_list const &other) = delete;
     
     allocator_sorted_list &operator=(
-        allocator_sorted_list const &other);
+        allocator_sorted_list const &other) = delete;
 
     allocator_sorted_list(
         allocator_sorted_list &&other) noexcept;
@@ -78,6 +65,19 @@ private:
     std::vector<allocator_test_utils::block_info> get_blocks_info_inner() const override;
     
     inline logger *get_logger() const override;
+
+
+    inline std::pmr::memory_resource* get_parent_resource() const noexcept;
+
+    inline std::mutex& get_mutex() const noexcept;
+
+    inline void* get_first_free() const noexcept;
+
+    inline void set_first_free(void* ptr) noexcept;
+
+    allocator_with_fit_mode::fit_mode get_fit_mode() const noexcept;
+
+    size_t get_total_size() const noexcept;
     
     inline std::string get_typename() const override;
 
@@ -141,6 +141,8 @@ private:
         sorted_iterator();
 
         sorted_iterator(void* trusted);
+
+        sorted_iterator(void* current_ptr, void* free_ptr, void* trusted_memory);
     };
 
     friend class sorted_iterator;

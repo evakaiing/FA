@@ -33,7 +33,7 @@ TEST(allocatorSortedListPositiveTests, test1)
     std::unique_ptr<logger> logger_instance(create_logger(std::vector<std::pair<std::string, logger::severity>>
                                                     {
                                                             {
-                                                                    "allocator_boundary_tags_tests_logs_false_positive_test_1.txt",
+                                                                    "allocator_sorted_list_tests_logs_false_positive_test_1.txt",
                                                                     logger::severity::information
                                                             },
                                                     }));
@@ -201,11 +201,15 @@ TEST(allocatorSortedListPositiveTests, test5)
                     {
                         case 0:
                             the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::first_fit);
+                            break;
                         case 1:
                             the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::the_best_fit);
+                            break;
                         case 2:
                             the_same_subject->set_fit_mode(allocator_with_fit_mode::fit_mode::the_worst_fit);
+                            break;
                     }
+
                     
                     allocated_blocks.push_front(allocator->allocate(sizeof(char) * rand() % 251 + 50));
                     std::cout << "allocation succeeded" << std::endl;
